@@ -22,9 +22,12 @@
     <!-- Mule Maven Plugin -->
     <mule.maven.plugin.version>4.3.0</mule.maven.plugin.version>
 
-    <!-- Credentials from Environment Variables -->
-    <anypoint.username>${env.ANYPOINT_USER}</anypoint.username>
-    <anypoint.password>${env.ANYPOINT_PASS}</anypoint.password>
+    <!-- Connected App Credentials -->
+    <anypoint.clientId>${env.ANYPOINT_CLIENT_ID}</anypoint.clientId>
+    <anypoint.clientSecret>${env.ANYPOINT_CLIENT_SECRET}</anypoint.clientSecret>
+
+    <!-- Business Group Name -->
+    <anypoint.businessGroup>My-Mulesoft-BG</anypoint.businessGroup>
   </properties>
 
   <build>
@@ -45,37 +48,35 @@
         <extensions>true</extensions>
 
         <configuration>
-
           <cloudHubDeployment>
-            <!-- Anypoint Platform URL -->
-            <uri>https://anypoint.mulesoft.com</uri>
 
-            <!-- Credentials -->
-            <username>${anypoint.username}</username>
-            <password>${anypoint.password}</password>
+            <!-- Connected App Auth (RECOMMENDED) -->
+            <connectedAppClientId>${anypoint.clientId}</connectedAppClientId>
+            <connectedAppClientSecret>${anypoint.clientSecret}</connectedAppClientSecret>
 
-            <!-- Environment Name (Case Sensitive in Some Orgs) -->
-            <environmentName>sandbox</environmentName>
+            <!-- Business Group -->
+            <businessGroup>${anypoint.businessGroup}</businessGroup>
 
-            <!-- CloudHub App Name -->
+            <!-- App Name -->
             <applicationName>circuit-breaker</applicationName>
 
-            <!-- Mule Runtime Version -->
+            <!-- Mule Runtime -->
             <runtimeVersion>${app.runtime}</runtimeVersion>
 
-            <!-- Region -->
+            <!-- CloudHub Region -->
             <region>us-east-1</region>
 
-            <!-- Workers -->
+            <!-- Workers Config -->
             <workers>
               <worker>
-                <type>MICRO</type>
                 <count>1</count>
+                <type>MICRO</type>
               </worker>
             </workers>
-          </cloudHubDeployment>
 
+          </cloudHubDeployment>
         </configuration>
+
       </plugin>
 
     </plugins>
