@@ -1,0 +1,9 @@
+{
+    "configs": [
+        "global-error-handler.xml",
+        "circuit-breaker-impl.xml",
+        "circuit-breaker-api.xml"
+    ],
+    "minMuleVersion": "4.9.3",
+    "javaSpecificationVersions": ["17"]
+}

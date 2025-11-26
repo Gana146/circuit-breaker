@@ -1,0 +1,199 @@
+#%RAML 1.0
+title: Circuit Breaker API
+version: v1
+description: |
+  A reusable MuleSoft asset that implements the Circuit Breaker pattern for microservices resilience.
+  This API can be published to Anypoint Exchange and reused across multiple applications.
+
+protocols: [HTTP, HTTPS]
+baseUri: http://localhost:8081/api
+mediaType: application/json
+
+types:
+  CircuitState:
+    type: object
+    properties:
+      serviceId:
+        type: string
+        description: The ID of the service
+      circuitState:
+        type: string
+        enum: [CLOSED, OPEN, HALF_OPEN]
+        description: The current state of the circuit
+      failureCount:
+        type: integer
+        description: The number of consecutive failures
+      lastFailureTime:
+        type: number
+        description: The timestamp of the last failure
+      lastAttemptTime:
+        type: number
+        description: The timestamp of the last attempt
+      halfOpenCallCount:
+        type: integer
+        description: The number of calls in half-open state
+      timestamp:
+        type: number
+        description: The current timestamp
+  
+  ResetResponse:
+    type: object
+    properties:
+      serviceId:
+        type: string
+        description: The ID of the service
+      message:
+        type: string
+        description: A message indicating the result of the operation
+      timestamp:
+        type: number
+        description: The current timestamp
+  
+  ErrorResponse:
+    type: object
+    properties:
+      status:
+        type: string
+        description: The status of the response
+      message:
+        type: string
+        description: A message describing the error
+      timestamp:
+        type: number
+        description: The current timestamp
+
+traits:
+  errorResponses:
+    responses:
+      500:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: |
+              {
+                "status": "ERROR",
+                "message": "An unexpected error occurred",
+                "timestamp": 1623456789000
+              }
+      503:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: |
+              {
+                "status": "ERROR",
+                "message": "Circuit is open. Service is unavailable.",
+                "timestamp": 1623456789000
+              }
+
+/:
+  get:
+    description: Get API documentation and available endpoints
+    responses:
+      200:
+        body:
+          application/json:
+            example: |
+              {
+                "message": "Welcome to Circuit Breaker API",
+                "endpoints": [
+                  {
+                    "path": "/api/posts",
+                    "description": "Get posts through circuit breaker"
+                  },
+                  {
+                    "path": "/api/users",
+                    "description": "Get users through circuit breaker"
+                  },
+                  {
+                    "path": "/api/circuit/{serviceId}/status",
+                    "description": "Get circuit breaker status for a service"
+                  },
+                  {
+                    "path": "/api/circuit/{serviceId}/reset",
+                    "description": "Reset circuit breaker for a service"
+                  },
+                  {
+                    "path": "/api/simulate/failure",
+                    "description": "Simulate a failing service"
+                  }
+                ]
+              }
+
+/posts:
+  get:
+    description: Get posts through circuit breaker
+    is: [errorResponses]
+    responses:
+      200:
+        body:
+          application/json:
+
+/users:
+  get:
+    description: Get users through circuit breaker
+    is: [errorResponses]
+    responses:
+      200:
+        body:
+          application/json:
+
+/circuit/{serviceId}/status:
+  uriParameters:
+    serviceId:
+      type: string
+      description: The ID of the service to check
+  get:
+    description: Get circuit breaker status for a service
+    is: [errorResponses]
+    responses:
+      200:
+        body:
+          application/json:
+            type: CircuitState
+            example: |
+              {
+                "serviceId": "posts-service",
+                "circuitState": "CLOSED",
+                "failureCount": 0,
+                "lastFailureTime": null,
+                "lastAttemptTime": null,
+                "halfOpenCallCount": 0,
+                "timestamp": 1623456789000
+              }
+
+/circuit/{serviceId}/reset:
+  uriParameters:
+    serviceId:
+      type: string
+      description: The ID of the service to reset
+  post:
+    description: Reset circuit breaker for a service
+    is: [errorResponses]
+    responses:
+      200:
+        body:
+          application/json:
+            type: ResetResponse
+            example: |
+              {
+                "serviceId": "posts-service",
+                "message": "Circuit breaker reset successfully",
+                "timestamp": 1623456789000
+              }
+
+/simulate/failure:
+  get:
+    description: Simulate a failing service
+    is: [errorResponses]
+    responses:
+      503:
+        body:
+          application/json:
+            type: ErrorResponse
+            example: |
+              {
+                "status": "ERROR",
+                "message": "Service is unavailable. Please try again later.",
+                "timestamp": 1623456789000
+              }

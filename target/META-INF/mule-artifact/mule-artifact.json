@@ -1,0 +1,32 @@
+{
+  "configs": [
+    "circuit-breaker-impl.xml",
+    "global-error-handler.xml",
+    "circuit-breaker-api.xml"
+  ],
+  "secureProperties": [],
+  "supportedJavaVersions": [],
+  "redeploymentEnabled": true,
+  "name": "e63b2e00-4922-441a-8112-1c47368bf037:circuit-breaker:1.0.1-SNAPSHOT",
+  "minMuleVersion": "4.9.3",
+  "requiredProduct": "MULE_EE",
+  "classLoaderModelLoaderDescriptor": {
+    "id": "mule",
+    "attributes": {
+      "exportedPackages": [],
+      "exportedResources": [
+        "api/circuit-breaker-api.raml",
+        "application-types.xml",
+        "circuit-breaker-api.xml",
+        "circuit-breaker-impl.xml",
+        "config.yaml",
+        "global-error-handler.xml",
+        "log4j2.xml"
+      ]
+    }
+  },
+  "bundleDescriptorLoader": {
+    "id": "mule",
+    "attributes": {}
+  }
+}

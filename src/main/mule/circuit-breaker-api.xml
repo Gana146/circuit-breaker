@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Main API Flow -->
+    
+    <!-- Posts API Flow -->
+    
+    <!-- Users API Flow -->
+    
+    <!-- Circuit Status API Flow -->
+    
+    <!-- Reset Circuit API Flow -->
+    
+    <!-- Simulate Failure API Flow -->
+	<flow name="circuit-breaker-api-main-flow">
+        <http:listener config-ref="circuit-breaker-api-httpListenerConfig" path="/api/posts">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        
+        <logger level="INFO" doc:name="Start Log" doc:id="93fd2c75-77b6-4e2f-ac20-1e50c6053c23" message='#["Circuit Breaker App Started"]'/>
+		<flow-ref name="circuit-breaker-impl-flow" doc:name="Flow Reference to circuit-breaker-impl-flow"/>
+        
+        <logger level="INFO" doc:name="End Log" doc:id="f10467cd-cd7c-497a-a585-5a7c78c88491" message='#["Circuit Breaker App Ended Started"]'/>
+		<error-handler ref="global-error-handler" />
+    </flow>
+
+</mule>

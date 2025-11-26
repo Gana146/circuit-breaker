@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:os="http://www.mulesoft.org/schema/mule/os"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Circuit Breaker Implementation -->
+    <sub-flow name="circuit-breaker-impl-flow">
+        
+        <ee:transform doc:name="Input Params" doc:id="40a17df4-c587-4626-992f-1e93921ba0db">
+			<ee:message>
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="inputParams" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"interfaceName" : attributes.queryParams.interfaceName,
+	"targetHost" : attributes.queryParams.host,
+	"targetPort" : attributes.queryParams.port,
+	"targetPath" : attributes.queryParams.path,
+	"targetMethod" : attributes.queryParams.method
+}]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<set-variable variableName="serviceName" value="#[vars.inputParams.interfaceName default 'default-Interface']" />
+		<set-variable variableName="failureThreshold" value="#[p('circuit.failureThreshold') as Number]" />
+        <set-variable variableName="resetTimeoutMs" value="#[p('circuit.resetTimeoutMs') as Number]" />
+        <set-variable variableName="halfOpenMaxCalls" value="#[p('circuit.halfOpenMaxCalls') as Number]" />
+
+        <!-- Retrieve current circuit state from Object Store -->
+        <os:retrieve key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore" target="circuitState">
+            <os:default-value><![CDATA[#[{
+    "state": "CLOSED",
+    "failureCount": 0,
+    "lastFailureTime": null,
+    "lastAttemptTime": null,
+    "halfOpenCallCount": 0
+}]]]></os:default-value>
+        </os:retrieve>
+		<choice doc:name="Circuit State Check">
+            <when expression="#[vars.circuitState.state == 'OPEN']">
+                <logger level="DEBUG" message="Circuit for service [#[vars.serviceName]] is OPEN. Checking timeout." />
+                <ee:transform doc:name="Transform Message" doc:id="702d2597-7a0f-4357-9df8-e6303e7b3cc4">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+((now() as DateTime {format: "dd-MM-yyyy-HH-mm-ss-SSS"}) - vars.circuitState.lastFailureTime) as Number {"unit" : "milliseconds"}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+				<choice doc:name="OPEN State Reset Timeout Check">
+                    <!-- Check if timeout for OPEN state has passed -->
+                    <when expression='#[payload &gt; vars.resetTimeoutMs]'>
+                        <!-- Transition to HALF_OPEN -->
+                        <logger level="INFO" message="Circuit for [#[vars.serviceName]] moving to HALF_OPEN." />
+                        <set-variable variableName="circuitState" value="#[vars.circuitState ++ {&#10;                            state: 'HALF_OPEN',&#10;                            lastAttemptTime: now() as DateTime {format: &quot;dd-MM-yyyy-HH-mm-ss-SSS&quot;},&#10;                            halfOpenCallCount: 0&#10;                        }]" />
+                        <os:store key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore">
+                            <os:value><![CDATA[#[vars.circuitState]]]></os:value>
+                        </os:store>
+                        <!-- Proceed to call the service -->
+                        <flow-ref name="target-Request-Flow" doc:name="Flow Reference to target-Request-Flow"/>
+                        <!-- If successful, close the circuit -->
+                        <logger level="INFO" message="Service [#[vars.serviceName]] call successful in HALF_OPEN state. Closing circuit." />
+                        <set-variable variableName="circuitState" value="#[vars.circuitState ++ {&#10;                            state: 'CLOSED',&#10;                            failureCount: 0,&#10;                            lastFailureTime: null,&#10;                            lastAttemptTime: null,&#10;                            halfOpenCallCount: 0&#10;                        }]" />
+                        <os:store key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore">
+                            <os:value><![CDATA[#[vars.circuitState]]]></os:value>
+                        </os:store>
+                    </when>
+                    <otherwise>
+                        <!-- Circuit is OPEN and timeout not passed, immediately fail -->
+                        <logger level="WARN" message="Circuit for [#[vars.serviceName]] is OPEN. Failing fast." />
+                        <raise-error type="CIRCUIT:OPEN" description="Service is currently unavailable (circuit open)." />
+                    
+</otherwise>
+                </choice>
+            
+</when>
+            <when expression="#[vars.circuitState.state == 'HALF_OPEN']">
+                <logger level="DEBUG" message="Circuit for service [#[vars.serviceName]] is HALF_OPEN." />
+                <!-- Check if we've exceeded the max calls allowed in HALF_OPEN state -->
+                <choice doc:name="HALF_OPEN Call Count Check">
+                    <when expression="#[vars.circuitState.halfOpenCallCount &lt; vars.halfOpenMaxCalls]">
+                        <!-- Increment the half-open call count -->
+                        <set-variable variableName="circuitState" value='#[vars.circuitState ++ {&#10;                            halfOpenCallCount: (vars.circuitState.halfOpenCallCount default 0) + 1,&#10;                            lastAttemptTime: now() as DateTime {format: "dd-MM-yyyy-HH-mm-ss-SSS"}&#10;                        }]' />
+                        <os:store key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore">
+                            <os:value><![CDATA[#[vars.circuitState]]]></os:value>
+                        </os:store>
+                        
+                        <!-- Try to call the service -->
+                        <try>
+                            <flow-ref name="target-Request-Flow" doc:name="Flow Reference to target-Request-Flow"/>
+                            <!-- If successful, close the circuit -->
+                            <logger level="INFO" message="Service [#[vars.serviceName]] call successful in HALF_OPEN state. Closing circuit." />
+                            <set-variable variableName="circuitState" value="#[vars.circuitState ++ {&#10;                                state: 'CLOSED',&#10;                                failureCount: 0,&#10;                                lastFailureTime: null,&#10;                                lastAttemptTime: null,&#10;                                halfOpenCallCount: 0&#10;                            }]" />
+                            <os:store key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore">
+                                <os:value><![CDATA[#[vars.circuitState]]]></os:value>
+                            </os:store>
+                            <error-handler>
+                                <on-error-continue type="ANY">
+                                    <!-- If failed, open the circuit again -->
+                                    <logger level="WARN" message="Service [#[vars.serviceName]] failed in HALF_OPEN state, opening circuit." />
+                                    <set-variable variableName="circuitState" value="#[vars.circuitState ++ {&#10;                                        state: 'OPEN',&#10;                                        lastFailureTime: now() as DateTime {format: &quot;dd-MM-yyyy-HH-mm-ss-SSS&quot;}&#10;                                    }]" />
+                                    <os:store key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore">
+                                        <os:value><![CDATA[#[vars.circuitState]]]></os:value>
+                                    </os:store>
+                                    <raise-error type="CIRCUIT:OPEN" description="Service failed in HALF_OPEN state, circuit opened." />
+                                </on-error-continue>
+                            </error-handler>
+                        </try>
+                    </when>
+                    <otherwise>
+                        <!-- Too many concurrent calls in HALF_OPEN state, fail fast -->
+                        <logger level="WARN" message="Too many concurrent calls to [#[vars.serviceName]] in HALF_OPEN state. Failing fast." />
+                        <raise-error type="CIRCUIT:OPEN" description="Service is in HALF_OPEN state with too many concurrent calls." />
+                    </otherwise>
+                </choice>
+            </when>
+            <otherwise>
+                <!-- State is CLOSED -->
+                <logger level="DEBUG" message="Circuit for service [#[vars.serviceName]] is CLOSED." />
+                <try>
+                    <flow-ref name="target-Request-Flow" doc:name="Flow Reference to target-Request-Flow"/>
+                    <!-- If successful, ensure failure count is reset -->
+                    <set-variable variableName="circuitState" value="#[vars.circuitState ++ { failureCount: 0 }]" />
+                    <os:store key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore">
+                        <os:value><![CDATA[#[vars.circuitState]]]></os:value>
+                    </os:store>
+                    <error-handler>
+                        <on-error-continue type="HTTP:BAD_GATEWAY, HTTP:CONNECTIVITY, HTTP:GATEWAY_TIMEOUT, HTTP:NOT_FOUND, HTTP:SERVICE_UNAVAILABLE, HTTP:TIMEOUT" enableNotifications="true" logException="true">
+                            <!-- Increment failure count -->
+                            <set-variable variableName="newFailureCount" value="#[(vars.circuitState.failureCount default 0) + 1]" />
+                            <set-variable variableName="circuitState" value='#[vars.circuitState ++ { failureCount: vars.newFailureCount }]' />
+                            <logger level="WARN" message="Service [#[vars.serviceName]] failed. Failure count: #[vars.newFailureCount]" />
+
+                            <choice doc:name="CLOSED State Failure Count Check">
+                                <when expression="#[vars.newFailureCount &gt;= vars.failureThreshold]">
+                                    <!-- Open the circuit -->
+                                    <logger level="ERROR" message="Circuit for [#[vars.serviceName]] opened due to excessive failures." />
+                                    <set-variable variableName="circuitState" value="#[vars.circuitState ++ { state: 'OPEN', lastFailureTime: now() as DateTime {format: &quot;dd-MM-yyyy-HH-mm-ss-SSS&quot;} }]" />
+                                    <os:store key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore">
+                                        <os:value><![CDATA[#[vars.circuitState]]]></os:value>
+                                    </os:store>
+                                    <raise-error type="CIRCUIT:OPEN" description="Service is currently unavailable (circuit opened)." />
+                                </when>
+                                <otherwise>
+                                    <!-- Store updated failure count, but don't open circuit yet -->
+                                    <os:store key="#[vars.serviceName]" objectStore="CircuitBreakerObjectStore">
+                                        <os:value><![CDATA[#[vars.circuitState]]]></os:value>
+                                    </os:store>
+                                    <raise-error type="ANY" description="Service is not avaliable and circuit is in closed state"/>
+                                </otherwise>
+                            </choice>
+                        </on-error-continue>
+                        <on-error-continue type="ANY">
+                            <!-- For other errors, just log and re-throw -->
+                            <logger level="ERROR" message="Unhandled error calling [#[vars.serviceName]]: #[error.description]" />
+                            <raise-error type="APP:UNEXPECTED_ERROR" description="Service is currently not avaliable due to other than mandatory errors and circuit is in open state"/>
+                        </on-error-continue>
+                    </error-handler>
+                </try>
+            </otherwise>
+        </choice>
+    </sub-flow>
+    
+    <!-- Subflow to execute the actual HTTP request -->
+	<sub-flow name="target-Request-Flow">
+        <http:request method="#[vars.inputParams.targetMethod]" 
+                      path="#[vars.inputParams.targetPath]" 
+                      config-ref="target-service-requestConfig" doc:name="target Request">
+            <http:headers><![CDATA[#[vars.headers default {}]]]></http:headers>
+            <http:query-params><![CDATA[#[vars.queryParams default {}]]]></http:query-params>
+        </http:request>
+    </sub-flow>
+</mule>

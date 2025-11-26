@@ -1,0 +1,12 @@
+# Build artifacts
+target/
+*.log
+
+# IDE files
+.classpath
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db

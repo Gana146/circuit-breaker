@@ -1,0 +1,9 @@
+# HTTP Configuration
+http:
+  port: "8081"
+
+# Circuit Breaker Configuration
+circuit:
+  failureThreshold: "3"
+  resetTimeoutMs: "30000"
+  halfOpenMaxCalls: "1"
