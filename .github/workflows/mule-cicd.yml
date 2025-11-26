@@ -35,10 +35,10 @@ jobs:
       - name: Deploy to CloudHub Sandbox
         run: |
           mvn -B mule:deploy \
-            -Dmule.env=sandbox \
-            -Dcloudhub.applicationName=circuit-breaker \
-            -Danypoint.username="${{ secrets.ANYPOINT_USER }}" \
-            -Danypoint.password="${{ secrets.ANYPOINT_PASS }}" \
-            -Dcloudhub.environment=sandbox \
-            -Dcloudhub.region=us-east-1 \
-            -Dmule.version=4.9.3
+            -DdeploymentType=cloudhub \
+            -DapplicationName=circuit-breaker \
+            -Denvironment=sandbox \
+            -Dregion=us-east-1 \
+            -DmuleVersion=4.9.3 \
+            -Dusername="${{ secrets.ANYPOINT_USER }}" \
+            -Dpassword="${{ secrets.ANYPOINT_PASS }}"
