@@ -71,4 +71,4 @@ The API includes comprehensive error handling with appropriate HTTP status codes
 
 ## Deployment
 
-This application can be deployed to CloudHub or on-premises Mule runtime. When publishing to Anypoint Exchange, it can be consumed by other applications as a dependency.
+This application can be deployed to CloudHub or on-premises Mule runtime. When publishing to Anypoint Exchange, it can be consumed by other applications as a dependency."# Trigger workflow" 
