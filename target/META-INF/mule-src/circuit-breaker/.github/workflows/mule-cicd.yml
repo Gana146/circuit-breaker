@@ -1,0 +1,41 @@
+name: Mule CI/CD Pipeline
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-test-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Cache Maven dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: Set Environment Variables
+        run: |
+          echo "ANYPOINT_USER=${{ secrets.ANYPOINT_USER }}" >> $GITHUB_ENV
+          echo "ANYPOINT_PASS=${{ secrets.ANYPOINT_PASS }}" >> $GITHUB_ENV
+
+      - name: Build Mule App
+        run: mvn -B clean package
+
+      - name: Run MUnit Tests
+        run: mvn -B test
+
+      - name: Deploy to CloudHub Sandbox
+        run: mvn -B clean deploy -DmuleDeploy
