@@ -15,7 +15,7 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <app.runtime>4.9.3</app.runtime>
-    <mule.maven.plugin.version>${mule.maven.plugin.version}</mule.maven.plugin.version>
+    <mule.maven.plugin.version>4.3.0</mule.maven.plugin.version>
     <anypoint.username>${env.ANYPOINT_USER}</anypoint.username>
     <anypoint.password>${env.ANYPOINT_PASS}</anypoint.password>
   </properties>
@@ -33,14 +33,12 @@
         <version>${mule.maven.plugin.version}</version>
         <extensions>true</extensions>
         <configuration>
-          <deployment>
-            <type>cloudhub</type>
-            <username>${anypoint.username}</username>
-            <password>${anypoint.password}</password>
-            <environment>sandbox</environment>
-            <region>us-east-1</region>
-            <muleVersion>${app.runtime}</muleVersion>
-          </deployment>
+          <deploymentType>cloudhub</deploymentType>
+          <username>${anypoint.username}</username>
+          <password>${anypoint.password}</password>
+          <environment>sandbox</environment>
+          <region>us-east-1</region>
+          <muleVersion>${app.runtime}</muleVersion>
         </configuration>
       </plugin>
     </plugins>
